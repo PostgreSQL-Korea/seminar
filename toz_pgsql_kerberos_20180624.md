@@ -37,10 +37,10 @@ $ sudo apt-get install bind9
 
 ```{.sh}
 $ sudo vi /etc/bind/named.conf.options
-    forwarders {
-		8.8.8.8;
-		8.8.4.4;
-	};
+forwarders {
+    8.8.8.8;
+    8.8.4.4;
+};
 ```
 
 그리고 내부 DNS Zone 설정을 진행한다.
@@ -59,10 +59,65 @@ zone "13.168.192.in-addr.arpa" {
 };
 ```
 
-Reverse Zone IP는 실험자의 컴퓨터에 맞춰 설정한다.
+Reverse Zone IP는 실험자의 컴퓨터에 맞춰 설정한다. Zone 파일에 대해서는 자세하게 설명하지 않는다.
 
-이제 Zone 파일을 생성한다.
+이제 Zone 파일을 생성하기 위해 템플릿 파일을 복사한다.
 
 ```{.sh}
-$
+$ cd /etc/bind
+$ sudo mkdir zones
+$ cd zones
+$ cp ../db.local db.sabre15.kr
+$ cp ../db.127 db.13.168.192
 ```
+
+각 Zone 파일을 다음과 유사하게 설정한다.
+
+```{.sh}
+$ sudo vi db.13.168.192
+;
+; BIND reverse data file for local loopback interface
+;
+$TTL	604800
+@	IN	SOA	ns.sabre15.kr. admin.sabre15.kr. (
+			      3		; Serial
+			 604800		; Refresh
+			  86400		; Retry
+			2419200		; Expire
+			 604800 )	; Negative Cache TTL
+;
+175 IN PTR ns.sabre15.kr. ; 192.168.0.175
+```
+
+```{.sh}
+;
+; BIND data file for local loopback interface
+;
+$TTL	604800
+@	IN	SOA	ns.sabre15.kr. admin.sabre15.kr. (
+			      3		; Serial
+			 604800		; Refresh
+			  86400		; Retry
+			2419200		; Expire
+			 604800 )	; Negative Cache TTL
+;
+	IN NS ns.sabre15.kr.
+
+ns.sabre15.kr.	IN	A	192.168.13.208
+kdc.sabre15.kr.	IN	A	192.168.13.208
+
+_kerberos._udp.SABRE15.KR. IN SRV 1 0 88 kdc.sabre15.kr.
+_kerberos._tcp.SABRE15.KR. IN SRV 1 0 88 kdc.sabre15.kr. 
+_kerberos-adm._tcp.SABRE15.KR. IN SRV 1 0 749 kdc.sabre15.kr.
+_kpasswd._udp.SABRE15.KR. IN SRV 1 0 464 kdc.sabre15.kr.
+```
+
+Forwared Zone 설정 파일에서는 KDC 서버를 찾을 수 있도록 설정한 4개 줄이 매우 중요한 일을 수행한다.
+
+도메인 설정을 모두 마치면 DNS 서버를 재시작한다.
+
+```{.sh}
+$ sudo /etc/init.d/bind9 restart
+```
+
+### 커베로스 설정
