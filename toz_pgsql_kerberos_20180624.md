@@ -148,10 +148,85 @@ Principal "steve/admin@KDC.SABRE15.KR" created.
 kadmin.local: quit
 ```
 
-kadmin.local은 KDC 서버에 Principal을 생성하는 명령이다. 위 명령에서는 크게 4번의 입력을 진행하는데 첫번째 명령은 principal을 추가하는 명령이다.
-add
+kadmin.local은 KDC 서버에 Principal을 생성하는 명령이다. 위 명령에서는 크게 4번의 입력을 진행하는데 첫번째 명령은 관리자 principal을 추가하는 명령이다.
+principal의 추가는 addprinc 명령으로 할 수 있다.
 
-/etc/krb5kdc/kadm5.acl
-sudo systemctl restart krb5-admin-server.service
-kinit steve/admin
-steve/admin@EXAMPLE.COM's Password:
+addprinc 계정이름/admin으로 하면 된다.
+
+principal 생성이 시작되면 비밀번호를 2번 입력받는다. 이 과정이 끝나면 관리자 계정이 생성되었음을 알리고 다시 kadmin.local: 프롬프트가 나오면 quit를 입력하고 빠져나오면 된다.
+
+이제 ACL 파일을 생성한다.
+
+```{.sh}
+$ sudo vi /etc/krb5kdc/kadm5.acl
+steve/admin@KDC.SABRE15.KR        *
+```
+
+이제 커베로스를 재시작하고 접속을 테스트한다.
+
+```{.sh}
+$ sudo systemctl restart krb5-admin-server.service
+$ kinit steve/admin
+steve/admin@KDC.SABRE15.KR's Password:
+```
+
+kinit은 커베로스 인증을 하고 TGT를 받는데 사용하며 여기서는 관리자 계정으로 접속을 테스트한다. 접속이 성공하면 klist 명령을 실행했을때 유의미한 결과를 볼 수 있을 것이다.
+
+### PostgreSQL 커베로스 설정
+커베로스 기본 접속 테스트가 끝나면 PostgreSQL에 커베로스 인증을 할 수 있도록 설정 및 커베로스 계정을 생성한다.
+
+다음은 커베로스 PostgreSQL Principal을 생성하는 명령이다.
+```{.sh}
+$ sudo kadmin.local -q "addprinc postgres/sabre15@KDC.SABRE15.KR"
+```
+
+'postgres/sabre15@KDC.SABRE15.KR' Principal을 생성할때 비밀번호를 물어보는데 이 때 물어보는 비밀번호는 PostgreSQL Principal이 사용할 비밀번호이다. 만약 이 과정에서 더 이상 넘어가지 않으면 커베로스에 관리자 접속이 되어 있지 않을 것이므로 앞의 절차에 따라 관리자로 접속한다.
+
+이제 커베로스 인증에 사용할 수 있도록 PostgreSQL용 키 탭 파일을 생성한다.
+
+```{.sh}
+kinit -k -t pgsql.keytab  postgres/sabre15@KDC.SABRE15.KR
+```
+
+키 탭 파일은 kinit 명령을 실행한 위치에 생성된다. 이 파일은 PostgreSQL 대몬이 접근할 수 있는 위치에 있어야 한다. 우분투는 사용자 홈 디렉터리에도 접근할 수 있으므로 /home/jiho에 두었다고 가정한다.
+  
+### PostgreSQL 접속 설정
+
+커베로스를 사용한 인증에 사용하기 위한 PostgreSQL 계정을 생성한다.
+
+```{.sh}
+psql -c 'CREATE ROLE "postgres/sabre15@KDC.SABRE15.KR" SUPERUSER LOGIN'
+```
+
+계정 생성이 끝나면 postgresql.conf 파일을 편집한다.
+
+```{.sh}
+$ sudo vi /etc/postgresql/9.6/main/postgresql.conf
+... 중략
+krb_server_keyfile = '/home/jiho/pgsql.keytab'
+... 중략
+```
+
+이제 PostgreSQL 접근 설정 파일을 편집한다.
+
+```{.sh}
+$ sudo vi /etc/postgresql/9.6/main/pg_hba.conf
+... 중략
+host all all 0.0.0.0/0 gss include_realm=1 krb_realm=KDC.SABRE15.KR
+```
+
+이들 설정 파일 편집이 끝나면 PostgreSQL 서버를 재시작한다.
+
+```{.sh}
+$ sudo /etc/init.d/postgresql restart
+```
+
+PostgreSQL이 잘 시작되면 kinit으로 TGT를 받아오고 PostgreSQL에 접속한다.
+
+```{.sh}
+$ kinit postgres/sabre15@KDC.SABRE15.KR
+$ psql -U "postgres/sabre15@KDC.SABRE15.KR" -h kdc.sabre15.kr postgres
+```
+
+커베로스 인증은 TGT 티켓을 받아온 이후 세션 유지 시간 동안은 KDC 서버가 꺼져 있어도 접속되기에 SSSD 서버를 따로 사용하기도 한다.
+커베로스 세션 종료는 kdestory 명령을 내리면 종료된다.
