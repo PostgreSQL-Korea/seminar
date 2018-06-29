@@ -16,4 +16,53 @@
 * 키탭: KDC의 주 데이터베이스를 덤프한 파일이며, 서비스 또는 호스트의 암호화 키를 포함한다.
 
 ### 커베로스 구성
-커베로스는...
+커베로스는 다양한 운영체제에서 구성 가능하지만 여기에서는 우분투 리눅스 18.04 기준으로 구성하여 테스트 하였다.
+
+#### 커베로스 설치
+```{.sh}
+$ sudo apt-get install krb5-admin-server krb5-config krb5-doc krb5-kdc
+```
+
+커베로스 설치시 REALM 이름을 3번 입력하는데 3번 모두 임의의 도메인 이름(여기서는 KDC.SABRE15.KR)로 지정한다.
+
+### BIND 설치
+Kerberos는 DNS 서버를 따로 필요로 한다. 이에 내부 DNS를 구성한다.
+
+```{.sh}
+$ sudo apt-get install bind9
+```
+
+### BIND 구성
+내부 DNS가 외부 DNS를 사용할 수 있도록 옵션을 설정한다.
+
+```{.sh}
+$ sudo vi /etc/bind/named.conf.options
+    forwarders {
+		8.8.8.8;
+		8.8.4.4;
+	};
+```
+
+그리고 내부 DNS Zone 설정을 진행한다.
+
+```{.sh}
+$ sudo vi /etc/bind/named.conf.local
+... 중략
+zone "sabre15.kr" {
+	type master;
+	file "/etc/bind/zones/db.sabre15.kr";
+};
+
+zone "13.168.192.in-addr.arpa" {
+	type master;
+	file "/etc/bind/zones/db.13.168.192";
+};
+```
+
+Reverse Zone IP는 실험자의 컴퓨터에 맞춰 설정한다.
+
+이제 Zone 파일을 생성한다.
+
+```{.sh}
+$
+```
