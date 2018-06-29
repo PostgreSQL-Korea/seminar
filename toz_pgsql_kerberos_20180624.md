@@ -120,4 +120,38 @@ Forwared Zone 설정 파일에서는 KDC 서버를 찾을 수 있도록 설정�
 $ sudo /etc/init.d/bind9 restart
 ```
 
+도메인이 재시작되면 /etc/resolv.conf 파일에 nameserver 속성값을 192.168.13.208 등으로 설정한다.
+
 ### 커베로스 설정
+앞에서 커베로스를 apt-get 명령으로 설치하였으면 새로운 영역이 생성되었음을 Kerberos에 알린다.
+
+```{.sh}
+$ sudo krb5_newrealm
+```
+
+그리고 나서 KDC 설정을 다시 설정한다.
+
+```{.sh}
+$ sudo dpkg-reconfigure krb5-kdc
+```
+
+dpkg-reconfigure 명령이 제대로 실행됐으면 커베로스 마스터 관리자를 설정한다.
+
+```{.sh}
+sudo kadmin.local
+Authenticating as principal root/admin@KDC.SABRE15.KR with password.
+kadmin.local: addprinc steve/admin
+WARNING: no policy specified for steve/admin@KDC.SABRE15.KR; defaulting to no policy
+Enter password for principal "steve/admin@KDC.SABRE15.KR": 
+Re-enter password for principal "steve/admin@KDC.SABRE15.KR: 
+Principal "steve/admin@KDC.SABRE15.KR" created.
+kadmin.local: quit
+```
+
+kadmin.local은 KDC 서버에 Principal을 생성하는 명령이다. 위 명령에서는 크게 4번의 입력을 진행하는데 첫번째 명령은 principal을 추가하는 명령이다.
+add
+
+/etc/krb5kdc/kadm5.acl
+sudo systemctl restart krb5-admin-server.service
+kinit steve/admin
+steve/admin@EXAMPLE.COM's Password:
